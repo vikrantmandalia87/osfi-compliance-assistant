@@ -27,7 +27,7 @@ def ingest_pdf():
     
     # Load PDF
     print("Loading PDF...")
-    loader = PyPDFLoader("data/OSFI_Guideline_B-20.pdf")
+    loader = PyPDFLoader("data/Residential mortgage underwriting practices and procedures Guideline 2017.pdf")
     documents = loader.load()
     
     print(f"Loaded {len(documents)} pages")

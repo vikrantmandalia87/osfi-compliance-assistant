@@ -74,7 +74,7 @@ def get_pinecone_index():
     pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
     return pc.Index(os.getenv("PINECONE_INDEX_NAME"))
 
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5-mini")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 def get_answer(query):
     # ---------------------------
@@ -91,16 +91,23 @@ def get_answer(query):
     # 2️⃣ Detect intent → task
     # ---------------------------
     # Detect rate-related queries explicitly
-    rate_terms = ["minimum qualifying rate", "mqr", "stress test rate", "qualifying rate", "interest rate", "rate"]
-    if any(term in query_lower for term in rate_terms):
-        matched_topics.extend(["minimum qualifying rate", "stress testing", "interest rate"])
-        is_summary = True
+    mortgage_topics = {
+        "minimum qualifying rate": ["qualifying rate", "stress test", "buffer", "floor rate"],
+        "debt service": ["gds", "tds", "gross debt service", "total debt service", "debt ratio"],
+        "ltv": ["loan to value", "loan-to-value", "ltv ratio", "high ratio", "low ratio"],
+        "income verification": ["income", "employment", "self-employed", "notice of assessment"],
+        "mortgage insurance": ["cmhc", "mortgage default insurance", "insured mortgage", "uninsured"],
+        "heloc": ["home equity line", "heloc", "revolving credit"],
+        "non-conforming": ["non-conforming", "high risk", "low credit score"],
+        "appraisal": ["property value", "appraisal", "valuation", "collateral"],
+        "documentation": ["loan documentation", "documentation", "records"],
+        "aml": ["anti-money laundering", "fintrac", "pcmltfa", "suspicious"]
+    }
     
-    for key, instruction in ROLE_INTENT_MAP.items():
-        if key in query_lower:
-            llm_task = instruction
+    for topic, keywords in mortgage_topics.items():
+        if any(kw in query_lower for kw in keywords):
+            matched_topics.extend([topic] + keywords[:2])
             is_summary = True
-            break
 
     # ---------------------------
     # 3️⃣ Topic expansion (RAG help)
@@ -112,10 +119,11 @@ def get_answer(query):
     # ---------------------------
     # 4️⃣ Guardrail: OSFI scope
     # ---------------------------
-    if "osfi" in query_lower and "b-20" not in query_lower:
+    off_topic_terms = ["corporate governance", "capital adequacy", "liquidity", "bcbs", "basel", "insurance companies act"]
+    if any(term in query_lower for term in off_topic_terms) and "mortgage" not in query_lower:
         return (
-            "This assistant is limited to OSFI Guideline B-20 (Residential Mortgage Underwriting). "
-            "Please ask a B-20–specific question.",
+            "This assistant is specialized in OSFI Guideline B-20 (Residential Mortgage Underwriting). "
+            "Please ask about mortgage underwriting, borrower assessment, or related topics.",
             [],
             "Low"
         )
@@ -184,100 +192,80 @@ def get_answer(query):
     """
 
     try:
-        response = client.responses.create(
-            model=OPENAI_MODEL,
-            input=[
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
                 {
-                    "role": "system",
-                    "content": """You are an expert regulatory compliance assistant specialized exclusively in OSFI Guideline B-20 (Residential Mortgage Underwriting Practices and Procedures).
+                     "role": "system",
+                     "content": """You are an expert regulatory compliance assistant specialized in OSFI Guideline B-20: Residential Mortgage Underwriting Practices and Procedures (2017).
 
-Your purpose is to help users understand, interpret, and apply OSFI B-20 requirements in a clear, practical, and regulator-safe manner.
+                        This guideline covers:
+                        - Residential Mortgage Underwriting Policy (RMUP)
+                        - Borrower background, credit history, and income verification
+                        - Debt service coverage (GDS/TDS ratios)
+                        - Loan-to-Value (LTV) ratios and appraisals
+                        - Mortgage insurance requirements
+                        - Home Equity Lines of Credit (HELOCs)
+                        - Non-conforming and high-ratio mortgages
+                        - Stress testing and model validation
+                        - Anti-money laundering compliance
+                        - Supervisory expectations for FRFIs (Federally Regulated Financial Institutions)
 
-━━━━━━━━━━━━━━━━━━━━━━
-CORE OPERATING RULES
-━━━━━━━━━━━━━━━━━━━━━━
-1. You MUST answer in clear, professional, plain English.
-2. You MUST produce a detailed, explanatory response — never references only.
-3. You MUST rely ONLY on the provided OSFI B-20 context.
-4. You MUST NOT invent requirements, thresholds, or interpretations.
-5. If information is missing or unclear in the context, state this explicitly.
-6. Cite OSFI B-20 page numbers inline, e.g. (OSFI B-20, Page 12).
+                        You MUST cite specific page numbers from the guideline.
 
-━━━━━━━━━━━━━━━━━━━━━━
-UNDERSTANDING USER INTENT
-━━━━━━━━━━━━━━━━━━━━━━
-The user may ask:
-- Broad questions (e.g., "guidelines for underwriters")
-- Topic-specific questions (e.g., income verification, stress testing)
-- Product-specific questions (e.g., default insured mortgages)
-- Scenario-based questions (e.g., how a rule applies in practice)
-- Requests for examples or explanations
+                        ━━━━━━━━━━━━━━━━━━━━━━
+                        CORE OPERATING RULES
+                        ━━━━━━━━━━━━━━━━━━━━━━
+                        1. You MUST answer in clear, professional, plain English.
+                        2. You MUST produce a detailed, explanatory response — never references only.
+                        3. You MUST rely ONLY on the provided OSFI B-20 context.
+                        4. You MUST NOT invent requirements, thresholds, or interpretations.
+                        5. If information is missing or unclear in the context, state this explicitly.
+                        6. Cite OSFI B-20 page numbers inline, e.g. (OSFI B-20, Page 12).
 
-You must infer the intent and respond appropriately while staying within OSFI B-20.
+                        ━━━━━━━━━━━━━━━━━━━━━━
+                        MANDATORY RESPONSE STRUCTURE
+                        ━━━━━━━━━━━━━━━━━━━━━━
+                        You MUST use the following structure in EVERY response:
 
-━━━━━━━━━━━━━━━━━━━━━━
-MANDATORY RESPONSE STRUCTURE
-━━━━━━━━━━━━━━━━━━━━━━
-You MUST use the following structure in EVERY response:
+                        OVERVIEW
+                        - 2–4 sentences summarizing the relevant OSFI B-20 guidance
 
-OVERVIEW
-- 2–4 sentences summarizing the relevant OSFI B-20 guidance
-- Describe the regulatory objective and risk being addressed
+                        KEY OSFI B-20 REQUIREMENTS
+                        - Bullet points (minimum 4 bullets)
+                        - Each bullet must include an inline page reference
 
-KEY OSFI B-20 REQUIREMENTS
-- Bullet points (minimum 4 bullets)
-- Each bullet must clearly explain a requirement or expectation
-- Each bullet must include an inline page reference
+                        PRACTICAL APPLICATION
+                        - Explain how lenders or underwriters apply these requirements
 
-PRACTICAL APPLICATION
-- Explain how lenders or underwriters apply these requirements in real workflows
-- Describe what decisions, checks, or documentation are expected
+                        EXAMPLES (WHEN APPLICABLE)
+                        - Provide 1–3 concrete examples if the question asks for explanation
 
-EXAMPLES (WHEN APPLICABLE)
-- Provide 1–3 concrete examples if the question asks for explanation or illustration
-- Use simple numbers or scenarios ONLY if supported by the context
-- If numerical examples are not provided in the context, explicitly say:
-  "OSFI B-20 does not prescribe specific numerical examples in the retrieved sections."
+                        LIMITATIONS / NOTES
+                        - Clearly state any limitations in the retrieved guidance
 
-LIMITATIONS / NOTES
-- Clearly state any limitations in the retrieved guidance
-- Identify where OSFI principles are high-level rather than prescriptive
-
-━━━━━━━━━━━━━━━━━━━━━━
-TONE AND STYLE
-━━━━━━━━━━━━━━━━━━━━━━
-- Professional and neutral (regulator-facing)
-- Clear enough for business users and underwriters
-- No legal advice language
-- No speculation or opinion
-
-━━━━━━━━━━━━━━━━━━━━━━
-FAIL-SAFE BEHAVIOR
-━━━━━━━━━━━━━━━━━━━━━━
-If the context does not sufficiently answer the question:
-- Say so explicitly
-- Explain what aspect is not covered in the retrieved OSFI B-20 sections
-- Do NOT attempt to fill gaps from general knowledge
-
-Remember:
-Your role is to EXPLAIN OSFI B-20, not to interpret beyond it."""
+                        Remember:
+                        Your role is to EXPLAIN OSFI B-20, not to interpret beyond it."""
                 },
                 {
                     "role": "user", 
                     "content": prompt
                 }
             ],
-            max_output_tokens=2000,
-            reasoning={"effort": "low"}
+            max_tokens=2000,
+            temperature=0.3
         )
         
-        answer = response.output_text
+        answer = response.choices[0].message.content
 
     except Exception as e:
         st.error(f"LLM Error: {str(e)}")
+        import traceback
+        st.code(traceback.format_exc())
         answer = ""
 
     # Fallback for short/empty answers
+    
     if not answer or len(answer.strip()) < 120:
         answer = (
             "Based on OSFI Guideline B-20, mortgage underwriters are expected to "
@@ -300,10 +288,18 @@ Your role is to EXPLAIN OSFI B-20, not to interpret beyond it."""
     return answer, matches, confidence
 
 
-query = st.text_input("Enter your compliance question:", 
-                      placeholder="e.g., What is the minimum qualifying rate?")
+# Initialize session state for query
+if 'last_query' not in st.session_state:
+    st.session_state.last_query = ""
 
-if query:
+# Create form for query input
+with st.form(key="query_form"):
+    query = st.text_input("Enter your compliance question:", 
+                          placeholder="e.g., What is the minimum qualifying rate?")
+    submit_button = st.form_submit_button("Submit", type="primary")
+
+# Process when form is submitted (Enter key or button click)
+if submit_button and query:
     with st.spinner("Analyzing..."):
         try:
             answer, sources, confidence = get_answer(query)
@@ -327,4 +323,19 @@ if query:
             st.error(f"Error: {str(e)}")
             st.info("Run ingest.py first and check API keys.")
 
-st.caption("Built for demonstration. Not official OSFI guidance.")
+# Display results if they exist
+if 'last_answer' in st.session_state and st.session_state.last_answer:
+    st.subheader("Answer")
+    st.write(st.session_state.last_answer)
+    
+    color = "green" if st.session_state.last_confidence == "High" else "orange" if st.session_state.last_confidence == "Medium" else "red"
+    st.markdown(f"<span style='color:{color};font-weight:bold'>Confidence: {st.session_state.last_confidence}</span>", 
+               unsafe_allow_html=True)
+    
+    if st.session_state.last_answer.strip():
+        st.subheader("Supporting OSFI References")
+        for i, match in enumerate(st.session_state.last_sources, 1):
+            with st.expander(f"Source {i} (Page {match.metadata.get('page', 'N/A')})"):
+                st.write(match.metadata["text"][:500] + "...")
+    
+    st.caption(f"Query ID: {hash(st.session_state.last_query + str(datetime.now())) % 10000}")
