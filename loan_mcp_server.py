@@ -60,6 +60,8 @@ def query_loans(
     breach_identified: Optional[bool] = None,
     min_credit_score: Optional[int] = None,
     max_credit_score: Optional[int] = None,
+    min_dti: Optional[float] = None,
+    max_dti: Optional[float] = None,
     limit: int = 20,
 ) -> str:
     """
@@ -75,6 +77,8 @@ def query_loans(
         breach_identified: True = has breach, False = no breach
         min_credit_score: Minimum borrower credit score
         max_credit_score: Maximum borrower credit score
+        min_dti: Minimum borrower DTI ratio as a percentage (e.g. 40 for DTI >= 40%)
+        max_dti: Maximum borrower DTI ratio as a percentage (e.g. 44 for DTI <= 44%)
         limit: Max rows to return (default 20, capped at 100)
     """
     conditions: list[str] = []
@@ -107,9 +111,18 @@ def query_loans(
     if max_credit_score is not None:
         conditions.append("borrower_credit_score <= %s")
         params.append(max_credit_score)
+    if min_dti is not None:
+        conditions.append("borrower_dti >= %s")
+        params.append(min_dti)
+    if max_dti is not None:
+        conditions.append("borrower_dti <= %s")
+        params.append(max_dti)
 
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     limit = min(int(limit), 100)
+
+    # When filtering by DTI, sort by DTI descending so highest-risk loans appear first
+    order_by = "borrower_dti DESC" if (min_dti is not None or max_dti is not None) else "loan_amount DESC"
 
     sql = f"""
         SELECT
@@ -120,7 +133,7 @@ def query_loans(
             breach_identified, funding_date
         FROM public.retail_lending
         {where_clause}
-        ORDER BY loan_amount DESC
+        ORDER BY {order_by}
         LIMIT %s
     """
     params.append(limit)

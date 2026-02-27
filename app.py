@@ -616,6 +616,17 @@ _LOAN_DB_TRIGGERS = [
     "stress test passed", "stress test failed", "breach identified",
     "breach found", "all loans", "loans with breach",
     "from branch", "branch id", "loans from branch", "loans from br",
+    # DTI triggers
+    "dti", "debt to income", "debt-to-income",
+    "records where dti", "records with dti", "records where",
+    "where dti", "dti greater", "dti less", "dti above", "dti below",
+    "dti over", "dti under", "dti more than", "dti higher",
+    "high dti", "low dti", "dti ratio",
+    # Credit score triggers
+    "credit score", "credit score above", "credit score below",
+    # General record queries
+    "give me all records", "show all records", "all records",
+    "records above", "records below", "records greater", "records less",
 ]
 
 
@@ -651,9 +662,19 @@ Available parameters for query_loans:
   branch_id         (string) – branch ID e.g. "BR-001". If user says "branch 1" or "branch 001" use "BR-001".
   stress_test_passed (bool)  – true = passed, false = failed
   breach_identified  (bool)  – true = has breach, false = no breach
-  min_credit_score  (int)
-  max_credit_score  (int)
+  min_credit_score  (int)    – minimum borrower credit score
+  max_credit_score  (int)    – maximum borrower credit score
+  min_dti           (float)  – minimum DTI ratio as a percentage (e.g. 40 means DTI >= 40%)
+  max_dti           (float)  – maximum DTI ratio as a percentage (e.g. 44 means DTI <= 44%)
   limit             (int)    – max rows (default 50)
+
+DTI EXAMPLES:
+  "DTI > 40"          → {"min_dti": 40}
+  "DTI >= 50"         → {"min_dti": 50}
+  "DTI < 35"          → {"max_dti": 35}
+  "DTI between 30-44" → {"min_dti": 30, "max_dti": 44}
+  "high DTI loans"    → {"min_dti": 40}
+  "DTI over 50"       → {"min_dti": 50}
 
 Available parameters for get_loan_by_id:
   loan_id (string) – e.g. "LN-10001"
@@ -668,6 +689,8 @@ Available parameters for search_borrower:
 Return ONLY valid JSON. Examples:
   {"tool": "query_loans", "params": {"min_amount": 300000}}
   {"tool": "query_loans", "params": {"branch_id": "BR-001"}}
+  {"tool": "query_loans", "params": {"min_dti": 40}}
+  {"tool": "query_loans", "params": {"min_dti": 50, "limit": 50}}
   {"tool": "get_loan_by_id", "params": {"loan_id": "LN-10001"}}"""
 
     response = openai_client.chat.completions.create(
