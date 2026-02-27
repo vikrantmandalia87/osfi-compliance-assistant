@@ -120,6 +120,8 @@ st.markdown("""
         padding: 6px;
         border: 1px solid #E5E5EA;
         box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+        flex-wrap: wrap;
+        overflow-x: auto;
     }
     .stTabs [data-baseweb="tab"] {
         border-radius: 10px;
