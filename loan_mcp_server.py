@@ -6,6 +6,7 @@ Exposes PostgreSQL retail_lending table as MCP tools so the chatbot
 can query loan data using natural language.
 """
 
+import os
 import json
 import datetime
 from decimal import Decimal
@@ -14,6 +15,9 @@ from typing import Optional
 import psycopg2
 import psycopg2.extras
 from mcp.server.fastmcp import FastMCP
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ──────────────────────────────────────────────
 # Server setup
@@ -21,10 +25,11 @@ from mcp.server.fastmcp import FastMCP
 mcp = FastMCP("OSFI Loan Database")
 
 DB_CONFIG = {
-    "host": "localhost",
-    "port": 5432,
-    "dbname": "osfi_compliance",
-    "user": "vikrantmandalia",
+    "host":     os.getenv("DB_HOST",     "localhost"),
+    "port":     int(os.getenv("DB_PORT", "5432")),
+    "dbname":   os.getenv("DB_NAME",     "osfi_compliance"),
+    "user":     os.getenv("DB_USER",     "vikrantmandalia"),
+    "password": os.getenv("DB_PASSWORD", ""),
 }
 
 

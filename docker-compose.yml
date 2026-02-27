@@ -1,0 +1,69 @@
+# ─────────────────────────────────────────────────────────
+# OSFI Compliance AI Assistant — Docker Compose
+#
+# Usage:
+#   docker compose up -d          # start everything
+#   docker compose down           # stop
+#   docker compose logs -f app    # tail app logs
+#   docker compose logs -f db     # tail postgres logs
+#
+# First-time setup:
+#   docker compose up -d db       # start DB first
+#   docker compose exec app python ingest.py   # ingest PDF to Pinecone
+# ─────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL 16 ─────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: osfi_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       osfi_compliance
+      POSTGRES_USER:     osfi_user
+      POSTGRES_PASSWORD: osfi_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init:/docker-entrypoint-initdb.d   # schema + seed on first run
+    ports:
+      - "5432:5432"     # expose locally for debugging; remove in production
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U osfi_user -d osfi_compliance"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Streamlit App ─────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: osfi_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # PostgreSQL — points to the db service above
+      DB_HOST:     db
+      DB_PORT:     "5432"
+      DB_NAME:     osfi_compliance
+      DB_USER:     osfi_user
+      DB_PASSWORD: osfi_pass
+      # API keys — loaded from your .env file (never baked into the image)
+      OPENAI_API_KEY:  ${OPENAI_API_KEY}
+      PINECONE_API_KEY: ${PINECONE_API_KEY}
+      PINECONE_INDEX:  ${PINECONE_INDEX:-osfi-compliance}
+    ports:
+      - "8501:8501"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  postgres_data:

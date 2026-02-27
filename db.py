@@ -4,6 +4,7 @@ Provides the same interface that vibrant-wozniak's mcp_client.py exposed,
 but queries the database directly via psycopg2 (no HTTP MCP layer needed).
 """
 
+import os
 import json
 import datetime
 from decimal import Decimal
@@ -11,12 +12,16 @@ from typing import Any, Dict, List, Optional
 
 import psycopg2
 import psycopg2.extras
+from dotenv import load_dotenv
+
+load_dotenv()
 
 DB_CONFIG = {
-    "host": "localhost",
-    "port": 5432,
-    "dbname": "osfi_compliance",
-    "user": "vikrantmandalia",
+    "host":     os.getenv("DB_HOST",     "localhost"),
+    "port":     int(os.getenv("DB_PORT", "5432")),
+    "dbname":   os.getenv("DB_NAME",     "osfi_compliance"),
+    "user":     os.getenv("DB_USER",     "vikrantmandalia"),
+    "password": os.getenv("DB_PASSWORD", ""),
 }
 
 

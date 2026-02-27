@@ -1,0 +1,40 @@
+# Secrets — NEVER bake into image
+.env
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Git
+.git/
+.gitignore
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# PDF data files (too large; ingest.py uploads to Pinecone separately)
+data/
+*.pdf
+
+# Logs
+*.log
+
+# Docker files (no need to copy into itself)
+Dockerfile
+docker-compose.yml
+.dockerignore
